@@ -16,13 +16,13 @@
 
      → 영상을 프레임 단위의 이미지로 추출
 
-     <img src="./img/data.png">
+     <img src="https://www.github.com/durudumba/Fps_augmentation/img/data.png">
 
      
 
    - AutoEncoder 네트워크 구현 및 학습
 
-   - <img src = "./img/net.png">
+     <img src = "./img/net.png">
 
      이미지 데이터를 학습에 적합하게 변환(크기조정, 수치화)
 
@@ -38,7 +38,6 @@
 
      <img src = "./img/result.png">
 
-​	
 
 3. **한계**
 
