@@ -16,13 +16,13 @@
 
      → 영상을 프레임 단위의 이미지로 추출
 
-     <img src="https://www.github.com/durudumba/Fps_augmentation/img/data.png">
+     <img src="https://github.com/durudumba/Fps_augmentation/blob/main/img/data.PNG">
 
      
 
    - AutoEncoder 네트워크 구현 및 학습
 
-     <img src = "./img/net.png">
+     <img src = "https://github.com/durudumba/Fps_augmentation/blob/main/img/net.PNG">
 
      이미지 데이터를 학습에 적합하게 변환(크기조정, 수치화)
 
@@ -34,9 +34,9 @@
 
      5분 20초 길이의 영상(256x144, 30fps) → 9,607장의 이미지(256x144)
 
-     <img src = "./img/test.png">
+     <img src = "https://github.com/durudumba/Fps_augmentation/blob/main/img/test.PNG">
 
-     <img src = "./img/result.png">
+     <img src = "https://github.com/durudumba/Fps_augmentation/blob/main/img/result.PNG">
 
 
 3. **한계**
