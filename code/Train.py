@@ -1,70 +1,75 @@
-#Library
-from Encoder import Encoder
-from Decoder import Decoder
-
-import time
 import torch
-import torch.nn as nn
-from torchvision import datasets, transforms
-import matplotlib.pyplot as plt
+from tqdm import tqdm
+from matplotlib import pyplot as plt
 
-if __name__ == '__main__':
+def train(args, model, train_loader, test_loader):
+    
+    ## Optimizer 설정
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+    
+    ## 학습하기
+    count = 0
+    train_loss_plot, eval_loss_plot = [], []
 
-    dataset_folder = '../data/image/'
-    # Hyperparameters 설정
-    learning_rate = 0.0001
-    num_epochs = 3
+    for epoch in tqdm(range(args.epochs), desc="Epoch"):
+        
+        # Train
 
-    # Image data preprocessing
-    transform = transforms.Compose([
-        transforms.Resize((144,144)),
-        transforms.ToTensor()])
-    dataset = datasets.ImageFolder(dataset_folder, transform=transform)
+        train_loss = 0
+        optimizer.zero_grad()
 
-    # Set GPU, Parameter, LossFunction, Optimizer
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    encoder = Encoder().to(device)
-    decoder = Decoder().to(device)
-    parameters = list(encoder.parameters()) + list(decoder.parameters())
-    loss_func = nn.MSELoss()
-    optimizer = torch.optim.Adam(parameters, lr=learning_rate)
+        model.train()
+        train_iterator = tqdm(enumerate(train_loader), total=len(train_loader), desc="Train")
 
-    # Training
-    loss_record=[]
-    for i in range(num_epochs):
-        start=time.time()
-        for index in range(dataset.__len__()-2):
+        for i, batch_item in train_iterator:
+            
+            future_data, past_data = batch_item
 
+            past_data = past_data.float().to(args.device)
+            future_data = future_data.float().to(args.device)
+
+            loss = model(past_data, future_data)
+            train_loss += loss.mean().item()
+
+            # Backward and optimize
             optimizer.zero_grad()
-            before = dataset.__getitem__(index)[0].unsqueeze(0).to(device)
-            target = dataset.__getitem__(index+1)[0].to(device)
-            after = dataset.__getitem__(index+2)[0].unsqueeze(0).to(device)
-
-            before_feature = encoder(before)
-            after_feature = encoder(after)
-            # Feature map 합성
-            xfmap = ((before_feature+after_feature)/2)
-            output = decoder(xfmap).squeeze(0)
-
-            # Loss Calculate
-            loss = loss_func(output, target)
             loss.backward()
             optimizer.step()
-            loss_record.append(loss.item())
 
-            if (index % 1000 == 0):
-                print("%d image processing : " % index, end='')
-                print(loss)
-
-        print("\nepochs : {0}, loss : {1}".format(i, loss))
-        used = time.time()-start
-        print("{0} min {1} sec used\n".format(int(used/60), int(used%60)))
-        torch.save([encoder, decoder], '../model/autoencoder_SeqImgPred.pkl')
-
-    # Loss 곡선그래프
-    plt.plot(loss_record)
-    plt.show()
+            train_iterator.set_postfix({
+                "train_loss" : float(loss),
+                "train_mean_loss" : train_loss/(i+1)
+            })
+        train_loss_plot.append(train_loss / len(train_loader))
 
 
+        # Validation
 
+        eval_loss = 0
+        
+        model.eval()
+        val_iterator = tqdm(enumerate(test_loader), total=len(test_loader), desc="Validation")
+        with torch.no_grad():
+            for i, batch_item in val_iterator:
 
+                future_data, past_data = batch_item
+                
+                past_data = past_data.float().to(args.device)
+                future_data = future_data.float().to(args.device)
+
+                loss = model(past_data, future_data)
+                eval_loss += loss.mean().item()
+
+                val_iterator.set_postfix({
+                    "eval_loss" : float(loss),
+                    "eval_mean_loss" : eval_loss/(i+1)
+                })
+        eval_loss_plot.append(eval_loss / len(test_loader))
+
+    plt.figure(figsize=(20,7))
+    plt.title("loss")
+    plt.plot(range(args.epochs), train_loss_plot, eval_loss_plot)
+    plt.legend(['train', 'eval'])
+
+    plt.savefig('./result/loss_graph.png')
+    return model

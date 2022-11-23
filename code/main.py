@@ -1,83 +1,75 @@
-#Library
-import glob
-from PIL import Image
-import shutil
+from DataCollect import DataCollect
+from Train import train
+from CustomDataset import CustomDataset
+from Execute import execute
+from AENet import AENet
+
+import easydict
+from glob import glob
 import os
-import cv2
-import av
+import natsort
 
-from torchvision import transforms, datasets
-from torchvision.utils import save_image
 import torch
+from torch.utils.data import DataLoader
+from sklearn.model_selection import train_test_split
 
-import DataCollect
 
-#base
-video_name='beach_video'
-video = '../test/%s.mp4'%video_name
-dataset_folder = '../test/%s/'%video_name
-os.makedirs(dataset_folder, exist_ok=True)
-destination_folder = '../test/%s_prediction/'%video_name
-os.makedirs(destination_folder, exist_ok=True)
+# 영상 수집 및 이미지화
+keywords = ['고양이']       ## 키워드 당 15개의 영상을 검색
+down_dir = './data/video/'   ## 다운받을 영상위치
+img_dir = './data/image/'    ## 프레임 이미지 저장 위치
+DataCollect.makeImages(keywords, down_dir, img_dir)
 
-# Video to Image
-os.makedirs(dataset_folder+'새 폴더/', exist_ok=True)
-DataCollect.frame_cut(video, dataset_folder+'새 폴더/')
 
-# Image data preprocess
-transform = transforms.Compose([
-    transforms.Resize((144, 144)),
-    transforms.ToTensor()])
-dataset = datasets.ImageFolder(dataset_folder, transform=transform)
+# 하이퍼파라미터 설정
+args = easydict.EasyDict({
+    "batch_size": 128, 
+    "device": torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'),
+    "learning_rate" : 5e-5,
+    "epochs" : 20,
+})
 
-# GPU활성화 및 encoder,decoder load
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-encoder, decoder = torch.load('../model/autoencoder_SeqImgPred.pkl')
+# 학습 데이터 구축
+img_path = natsort.natsorted(glob('./data/image/*/*.jpg'))
+train_path, val_path= train_test_split(img_path, test_size=0.2)
 
-# Image sequence prediction and Save image
-for index in range(dataset.__len__()-2):
+train_dataset = CustomDataset(train_path)
+val_dataset = CustomDataset(val_path)
 
-    before = dataset.__getitem__(index)[0].unsqueeze(0).to(device)
-    after = dataset.__getitem__(index+1)[0].unsqueeze(0).to(device)
+train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size)
+val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
 
-    before_fmap = encoder(before)
-    after_fmap = encoder(after)
-    #Feature map 합성
-    fmap = ((before_fmap+after_fmap)/2)
-    output = decoder(fmap).squeeze(0)
 
-    save_image(output, '%s%sp.jpg'%(destination_folder,str(index+1).zfill(7)))
+# 모델
+mode = 'train'              ## 'train' : 모델 학습진행 / 'load' : 모델 로드진행
+model = AENet(args)
+model_name = 'model.bin'    ## 학습/로드 할 모델명
+model_dir = './result/'     ## 모델 저장/로드 위치
+os.makedirs(model_dir, exist_ok=True)
 
-# Image resize //(144,144) -> (256,144)
-names=os.listdir(destination_folder)
-for name in names:
-    path = destination_folder+name
-    img = Image.open(path)
-    ir = img.resize((256,144))
-    ir.save(path)
+if mode=='train':
 
-# Original image+prediction image
-orignal_path = dataset_folder+'새 폴더/'
-orignals=os.listdir(orignal_path)
-for orignal in orignals:
-    path = orignal_path+orignal
-    shutil.copy(path, destination_folder)
+    ## 모델 학습
+    model.to(args.device)
 
-# Images to video
-# 참고자료 : https://theailearner.com/2018/10/15/creating-video-from-images-using-opencv-python/
-whole = os.listdir(destination_folder)
-vid = av.open(video).streams.video[0]
-fps = int(str(vid.average_rate).split('/')[0]) / int(str(vid.average_rate).split('/')[1])
+    model = train(args, model, train_dataloader, val_dataloader)
 
-img_array=[]
-for filename in glob.glob(destination_folder+'*.jpg'):
-    img = cv2.imread(filename)
-    height, width, layers = img.shape
-    size = (width,height)
-    img_array.append(img)
+    ## 모델 저장
+    os.makedirs(model_dir, exist_ok=True)
+    torch.save(model.state_dict(), model_dir+model_name)
 
-out = cv2.VideoWriter('../test/%s_worked.avi'%video_name,cv2.VideoWriter_fourcc(*'DIVX'),fps*2, size)
+elif mode=='load':
+    ## 모델 호출
+    model.load_state_dict(torch.load(model_dir+model_name))
+    model.to(args.device)
 
-for i in range(len(img_array)):
-    out.write(img_array[i])
-out.release()
+# 테스트
+
+test_video = './result/catvideo.mp4'      ## 증강할 영상 위치
+save_video = './result/catvideo_augmented.mp4'    ## 증강한 영상 저장 위치
+test_image_dir = './result/images/'        ## 프레임 컷 할 위치
+test_AugImg_dir = './result/images_aug/'   ## 이미지 증강 저장할 위치
+
+execute(test_video, save_video, test_image_dir, test_AugImg_dir, model, args)
+
+

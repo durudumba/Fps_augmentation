@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 import re
 import cv2
 import os
-import time
 
 class DataCollect():
     def __init__(self):
@@ -17,8 +16,7 @@ class DataCollect():
         for keyword in keywords:    #each keyword : 30urls
 
             req = requests.get('https://www.youtube.com/results?search_query=' + keyword)
-            html = req.text
-            soup = BeautifulSoup(html, 'html.parser')
+            soup = BeautifulSoup(req.text, 'html.parser')
 
             scripts = soup.select('script')[-6].get_text()
 
@@ -28,7 +26,7 @@ class DataCollect():
             for info in matches:
                 url_ = info.split(',')[0].replace('"', '')
                 urls.append('https://www.youtube.com' + url_)
-        print("url추출 완료")
+        print("Extract URL done.")
         return urls
 
     #영상 다운로드
@@ -41,56 +39,50 @@ class DataCollect():
         down_dir = video_dir
 
         video.download(output_path=down_dir, filename=file_name)
-        print("영상다운 완료")
+        print("Download video done.")
 
     #프레임 단위 분할
     def frame_cut(video_path, image_path):
+
         if os.path.isfile(video_path):
             vidcap = cv2.VideoCapture(video_path)
         else:
             print("FileNotExist")
-            exit()
+            exit(100)
         success, image = vidcap.read()
 
-        count = 1;
+        count = 0
         success = True
 
         while success:
             success, image = vidcap.read()
-            if not success :
+            if success == False :
                 break
-            cv2.imwrite(image_path + str(count).zfill(7) + ".jpg", image)
-            if(count%1000==0):
-                print("saved image %d.jpg" % count)
+            
+            cv2.imwrite(image_path+str(count)+".jpg", image)
 
-            if cv2.waitKey(10) == 27:
-                break
+            if (count%10000==0) & (count!=0):
+                print("%d.jpg saved." %count)
+
+            # if cv2.waitKey() == 27:
+            #     break
             count += 1
-        print("프레임 단위 분할 완료")
+        print("Frame_cut done. %d images saved."%count)
 
-#Train Data Collecting
+        return 0
 
-keywords=['고양이']
-down_dir = "../data/video/"
-img_dir = "../data/image/"
-#video download
-urls = DataCollect.find_url(keywords)
+    def makeImages(keywords, down_dir, img_dir):
+        urls = DataCollect.find_url(keywords)
+        download_videos = 2
 
-#video cut by frame
-for i in range(15):
-    index = str(i+1)
+        for i in range(download_videos):
+            index = str(i)
+            print(f'{index} video task start.')
 
-    start = time.time()
-    DataCollect.video_download(urls[i], index + ".mp4", down_dir)
-    print("%s 번 째 영상작업 중..."%index)
+            DataCollect.video_download(urls[i], (f'{index}.mp4'), down_dir)     ## 영상 다운로드
+            os.makedirs(img_dir+index, exist_ok=True)                    ## 프레임 저장위치
+            DataCollect.frame_cut(down_dir+index+'.mp4', img_dir+index+'/')     ## 프레임 분할
+            print(f'{index} video task done.')
 
-    os.makedirs(img_dir+index.zfill(2), exist_ok=True)
-    DataCollect.frame_cut(down_dir+index+".mp4", img_dir+index+"/")
 
-    runtime = time.time()-start
-    print("%s 번 째 영상 작업시간 : %d sec" %(index, runtime))
-    print("%s 번 째 영상 작업완료" %index)
 
-# 실험영상 프레임 컷
-image_path = '../test/cat video.mp4'
-DataCollect.frame_cut('../cat_video.mp4', '../cat_video/')
