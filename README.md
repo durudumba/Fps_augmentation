@@ -63,7 +63,17 @@
 
      </br>
 
-3. **참조**
+3. **결과**
+
+   <img src = "./result/concat.png">
+
+   영상에서 표현하는 객체의 위치와 이동에 대한 예측은 가능한 것으로 보임
+
+   그러나, 어둡고 흐릿한 것으로 보아 더 많은 데이터로 많은 학습이 필요한 것으로 예상됨
+
+   </br>
+
+4. **참조**
 
    - [LSTMAutoEncoder](https://joungheekim.github.io/2020/10/11/code-review/)
    - [ConvLSTM Encoder-Bidirectional LSTM Decoder](https://hwk0702.github.io/treatise%20review/2021/04/08/ConvLSTAMAE/)
