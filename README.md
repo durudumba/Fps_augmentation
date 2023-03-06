@@ -65,7 +65,7 @@
 
 3. **결과**
 
-   <img src = "./result/concat.png">
+   <img src = "./result/concat.PNG">
 
    영상에서 표현하는 객체의 위치와 이동에 대한 예측은 가능한 것으로 보임
 
